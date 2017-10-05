@@ -10,8 +10,9 @@ Baseliner = {
 	$style:				null,	//		''
 	styleSheet:			null,	// Stylesheet object (default blank)
 	baselineTop:		0,		// Default value
-	baseline:			12,		//      ''
-	baselineOpacity:	100,
+    baselineLeft:		0,		// Default value
+	baseline:			4,		//      ''
+	baselineOpacity:	75,
 	baselineColor:		'#CCCCCC',
 	baselineForceHeight: false,
 
@@ -28,12 +29,13 @@ Baseliner = {
 			// ...then lets update the default values with the ones used on current site
 			this.baseline = this.getBaselineDataAttribute();
 			this.baselineTop = this.getTopDataAttribute();
+            this.baselineLeft = this.getLeftDataAttribute();
 			this.baselineColor = this.getColorDataAttribute();
 			this.baselineOpacity = this.getOpacityDataAttribute();
 			this.baselineForceHeight = this.getForceHeightDataAttribute();
 		}
 
-		return this.setup(this.baseline, this.baselineTop, this.baselineColor, this. baselineOpacity, this.baselineForceHeight, true);
+		return this.setup(this.baseline, this.baselineTop, this.baselineLeft, this.baselineColor, this.baselineOpacity, this.baselineForceHeight, true);
 	},
 
 	/**
@@ -41,12 +43,12 @@ Baseliner = {
 	* 	@param ...
 	*	@param firstRunFlag - disables saving to storage on first run to avoid saving defaults
 	*/
-	setup: function (baseline, top, color, opacity, forceHeight, firstRunFlag) {
+	setup: function (baseline, top, left, color, opacity, forceHeight, firstRunFlag) {
 		Baseliner.removeBaseliner();
 
 		// Create style tag
 		Baseliner.$style = document.createElement('style');
-		Baseliner.$style.id = "baselinerStyle"
+		Baseliner.$style.id = "baselinerStyle";
 
 		// Add tag(s) to head
 		Baseliner.$style.appendChild(document.createTextNode("")); // WebKit hack :(
@@ -59,10 +61,10 @@ Baseliner = {
 		console.log('%c Baseliner added to page. ', 'background: #209C39; color: #DFDFDF');
 
 		// Initialises with object values
-		Baseliner.update(baseline, top, color, opacity, forceHeight, !!firstRunFlag);
+		Baseliner.update(baseline, top, left, color, opacity, forceHeight, !!firstRunFlag);
 
 		// ...and send them back to the Extension tab (main.js)
-		return [baseline, top, color, opacity, forceHeight];
+		return [baseline, top, left, color, opacity, forceHeight];
 	},
 
 	/**
@@ -77,7 +79,7 @@ Baseliner = {
 			if (item) {
 				// All done!
 				console.log('%c Baseliner loaded from Storage 🗄 ', 'background: #DFDFDF; color: #209C39');
-				Baseliner.setup(item.baseline, item.top, item.color, item.opacity, item.forceHeight);
+				Baseliner.setup(item.baseline, item.top, item.left, item.color, item.opacity, item.forceHeight);
 
 				// Tells extension we got data
 				chrome.runtime.sendMessage({data: item});
@@ -91,17 +93,19 @@ Baseliner = {
 	*	@param url
 	*	@param baseline
 	*	@param top
+	*	@param left
 	*	@param color
 	*	@param opacity
 	*	@param forceHeight
 	*	
 	*	async
 	*/
-	storeBaseliner: function (url, baseline, top, color, opacity, forceHeight) {
+	storeBaseliner: function (url, baseline, top, left, color, opacity, forceHeight) {
 		var saveObj = {},
 			current = {
 			baseline: baseline,
 			top: top,
+			left: left,
 			color: color,
 			opacity: opacity,
 			forceHeight: forceHeight
@@ -145,16 +149,20 @@ Baseliner = {
 	 * @param opacity
 	 * @param forceHeightFlag
 	 */
-	addRules: function(height, top, color, opacity, forceHeightFlag) {
+	addRules: function(height, top, left, color, opacity, forceHeightFlag) {
 		// Default rules
 		Baseliner.styleSheet = Baseliner.$style.sheet;
 		Baseliner.styleSheet.insertRule(".baseliner { position: relative; }", 0);
-		Baseliner.styleSheet.insertRule(".baseliner:after { position: absolute; width: auto; height: auto; z-index: 9999; content: ''; display: block; pointer-events: none; right: 0; bottom: 0; left: 0; }", 0);
+		Baseliner.styleSheet.insertRule(".baseliner:after { position: absolute; width: auto; height: auto; z-index: 9999; content: ''; display: block; pointer-events: none; right: 0; bottom: 0; }", 0);
 		Baseliner.styleSheet.insertRule(".baseliner:active:after { display: none; }", 0);
 
 		// Custom rules
-		Baseliner.styleSheet.insertRule(".baseliner:after {background: linear-gradient(rgba(" + Baseliner.hexToRgb(color).r + ", " + Baseliner.hexToRgb(color).g + ", " + Baseliner.hexToRgb(color).b + ", " + (opacity / 100) +") 1px, transparent 1px) left top / 1px " + height + "px; }", 0);
-		Baseliner.styleSheet.insertRule(".baseliner:after {top: " + top + "px;}", 0);
+		var colorRgba = "rgba(" + Baseliner.hexToRgb(color).r + ", " + Baseliner.hexToRgb(color).g + ", " + Baseliner.hexToRgb(color).b + ", " + (opacity / 100) +")";
+		Baseliner.styleSheet.insertRule(".baseliner:after {background: " +
+			"repeating-linear-gradient(to bottom, " + colorRgba + ", " + colorRgba +" 1px, transparent 1px, transparent " + height + "px), " +
+			"repeating-linear-gradient(to right, " + colorRgba + ", " + colorRgba +" 1px, transparent 1px, transparent " + height + "px);" +
+			"}", 0);
+		Baseliner.styleSheet.insertRule(".baseliner:after {top: " + top + "px; left: " + left + "px;}", 0);
 	
 		// Force Height Flag
 		if (forceHeightFlag) {
@@ -196,23 +204,25 @@ Baseliner = {
 	 * Updates Baseliner with new values
 	 * @param newBaseline
 	 * @param newTop
+ 	 * @param newLeft
 	 * @param newColor
 	 * @param newOpacity
 	 * @param forceHeightFlag
+	 * @param firstRunFlag
 	 */
-	update: function(newBaseline, newTop, newColor, newOpacity, forceHeightFlag, firstRunFlag) {
+	update: function(newBaseline, newTop, newLeft, newColor, newOpacity, forceHeightFlag, firstRunFlag) {
 
 		if ( !!Baseliner.styleSheet ) Baseliner.removeRules();
 
-		Baseliner.addRules(newBaseline, newTop, newColor, newOpacity, forceHeightFlag);
+		Baseliner.addRules(newBaseline, newTop, newLeft, newColor, newOpacity, forceHeightFlag);
 
-		Baseliner.setDataAttributes(newBaseline, newTop, newColor, newOpacity, forceHeightFlag);
+		Baseliner.setDataAttributes(newBaseline, newTop, newLeft, newColor, newOpacity, forceHeightFlag);
 
 		if (!firstRunFlag) {
-			Baseliner.storeBaseliner(window.location.origin, newBaseline, newTop, newColor, newOpacity, forceHeightFlag);
+			Baseliner.storeBaseliner(window.location.origin, newBaseline, newTop, newLeft, newColor, newOpacity, forceHeightFlag);
 		}
 
-		console.log('%c Baseliner has a new baseline of ' + newBaseline + '. starting at ' + parseInt(newTop) + '.', 'background: #DFDFDF; color: #209C39');
+		console.log('%c Baseliner has a new baseline of ' + newBaseline + '. starting at top ' + parseInt(newTop) + ' and left ' + parseInt(newLeft) + '.', 'background: #DFDFDF; color: #209C39');
 	},
 
 
@@ -239,9 +249,10 @@ Baseliner = {
 	 * @param opacity
 	 * @param force
 	 */
-	setDataAttributes: function(baseline, top, color, opacity, force){
+	setDataAttributes: function(baseline, top, left, color, opacity, force){
 		this.$body.setAttribute('blnr-bas', baseline);
 		this.$body.setAttribute('blnr-top', top);
+        this.$body.setAttribute('blnr-left', left);
 		this.$body.setAttribute('blnr-color', color);
 		this.$body.setAttribute('blnr-opacity', opacity);
 		this.$body.setAttribute('blnr-force', force);
@@ -273,6 +284,18 @@ Baseliner = {
 		}
 	},
 
+
+	/**
+	 * Returns left value from body if present
+	 * @returns {*}
+	 */
+	getLeftDataAttribute: function(){
+		if ( this.$body.getAttribute('blnr-left') && this.$body.getAttribute('blnr-left') !== ''){
+			return this.$body.getAttribute('blnr-left');
+		} else {
+			return false;
+		}
+	},
 
 	/**
 	 * Returns color value from body if present
